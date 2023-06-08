@@ -1,0 +1,19 @@
+{
+  "name": "routeplanner",
+  "version": "1.0.0",
+  "description": "Route optimization",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Toshe Panov",
+  "license": "ISC",
+  "dependencies": {
+    "@mapbox/mapbox-sdk": "^0.15.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.1.4",
+    "express": "^4.18.1",
+    "method-override": "^3.0.0",
+    "node-fetch": "^2.6.7"
+  }
+}
