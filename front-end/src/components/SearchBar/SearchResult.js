@@ -1,7 +1,6 @@
 import classes from './SearchResult.module.css';
 
 const SearchResult = ({ searchQuery, disableSearching }) => {
-
     const clickHandler = async () => {
         try {
             const response = await fetch('http://localhost:3001/addAddress', {

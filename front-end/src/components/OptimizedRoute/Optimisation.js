@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 
 import OptimisedRoute from './OptimisedRoute';
 
@@ -6,6 +6,12 @@ import AddressContext from '../../store/address-context';
 
 const Optimisation = () => {
     const addressCtx = useContext(AddressContext);
+
+    /* addressCtx.setAddressList(); */
+
+    useEffect(() => {
+        addressCtx.setAddressList();
+    }, [])
 
     const [optimisedRoute, setOptimisedRoute] = useState([]);
     const [routeDetails, setRouteDetails] = useState([]);
@@ -16,7 +22,9 @@ const Optimisation = () => {
                 const response = await fetch('http://localhost:3001/optimiseRoute');
                 const optimisedRouteArray = await response.json();
                 setOptimisedRoute(optimisedRouteArray.optimisedRoute);
+                addressCtx.addressList = optimisedRouteArray.optimisedRoute;
                 setRouteDetails(optimisedRouteArray.routeDetails);
+                addressCtx.routeDetails = optimisedRouteArray.routeDetails;
                 addressCtx.isOptimised = true;
             }
         }

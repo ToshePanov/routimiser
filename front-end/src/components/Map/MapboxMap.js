@@ -1,6 +1,5 @@
-import { useState, useEffect, useContext } from 'react';
-import Map, { Marker } from 'react-map-gl';
-import { Source, Layer } from 'react-map-gl';
+import { useState, useEffect, useContext, useMemo } from 'react';
+import Map, { Marker, Source, Layer } from 'react-map-gl';
 
 import polyline from '@mapbox/polyline';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -9,7 +8,6 @@ import classes from './MapboxMap.module.css';
 import AddressContext from '../../store/address-context';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
-console.log(MAPBOX_TOKEN);
 
 const MapboxMap = (props) => {
     const addressCtx = useContext(AddressContext);
@@ -26,6 +24,27 @@ const MapboxMap = (props) => {
     ]);
 
     useEffect(() => {
+        let lngs = [], lats = [];
+        for (let i in addressCtx.addressList) {
+            lngs.push(addressCtx.addressList[i].geometry[0]);
+            lats.push(addressCtx.addressList[i].geometry[1]);
+        }
+        const mapView = {
+            minLng: Math.min(...lngs),
+            maxLng: Math.max(...lngs),
+            minLat: Math.min(...lats),
+            maxLat: Math.max(...lats)
+        }
+        const max_bound = Math.max(Math.abs((mapView.minLat) - (mapView.maxLat)), Math.abs((mapView.minLng) - (mapView.maxLng))) * 111
+        const zoom = 13 - Math.log(max_bound);
+        setViewState({
+            latitude: ((mapView.minLat + mapView.maxLat) / 2) || 51.4,
+            longitude: ((mapView.minLng + mapView.maxLng) / 2) || -0.8,
+            zoom: (zoom === Infinity || zoom === -Infinity) ? 7 : zoom
+        })
+    }, [addressCtx.addressList]);
+
+    useEffect(() => {
         const handleWindowResize = () => {
             setWindowSize([window.innerWidth, window.innerHeight]);
         };
@@ -37,8 +56,8 @@ const MapboxMap = (props) => {
         };
     }, []);
 
-    const coordinatesArray = polyline.decode('}`d{Hn_LoD_k@xISqGuGnCqoAwGcR|b@wdAru@qq@j|@oCfc@fLf_Abz@r}FUfvAnz@dxAbFl{D|uAzqBpN`sA|nBdkA|n@zvA~B`HnXz^tS{HpB}FmE{A|_@zS~}A}O~g@Sl_BbDpP~SjCrGlZcdA`\\iEeO|@veBx}A~xDbGbaByt@vpAq[hjBeqC`kCom@hRwTpZmIfw@hOhxC}sAhrFsaAnc@}zAz_D{|@dZmjA}D}}@lr@~EmHoyAkdB{Lyt@__AqlAk{@~V}Tkc@}`@yTjAcJdwBg~EbAuhAiw@o|AyjAmtDsh@aTo~ByuBhi@k`CiTa`CkEgmCg\\mn@}e@qG{Yis@eCu`AhMseAw\\{vApEwfAiKabApJe]a_@eqA');
 
+    const coordinatesArray = addressCtx.routeDetails && polyline.decode(addressCtx.routeDetails.geometry);
     for (let i in coordinatesArray) {
         const helper = coordinatesArray[i][0];
         coordinatesArray[i][0] = coordinatesArray[i][1];
@@ -63,6 +82,14 @@ const MapboxMap = (props) => {
         }
     };
 
+    const markers = useMemo(() => addressCtx.addressList.map((address, i) => (
+        <Marker longitude={address.geometry[0]} latitude={address.geometry[1]} key={Math.random()} >
+            <div className={classes.marker}>
+                <span className={i === 0 ? classes.startPoint : undefined}><b>{i !== 0 ? i : 'o'}</b></span>
+            </div>
+        </Marker>
+    )), [addressCtx.addressList])
+
     return (
         <div className={classes.mapboxMap}>
             <Map
@@ -72,18 +99,10 @@ const MapboxMap = (props) => {
                 mapStyle="mapbox://styles/mapbox/streets-v12"
                 mapboxAccessToken={MAPBOX_TOKEN}
             >
-                {addressCtx.addressList.length > 0 && addressCtx.addressList.map((address, i) => (
-                    <Marker longitude={address.geometry[0]} latitude={address.geometry[1]} color={address.waypoint_index ? 'blue' : 'red'} key={Math.random()} >
-                        {/*  {i + 1} */}
-                    </Marker>
-                ))}
-                <Source id="my-data" type="geojson" data={geojson}>
+                {addressCtx.addressList && markers}
+                {addressCtx.isOptimised && <Source id="my-data" type="geojson" data={geojson}>
                     <Layer {...layerStyle} />
-                </Source>
-
-                {/* <Source id="route" type="geojson" data={geojson}>
-                    <Layer {...layerStyle} />
-                </Source> */}
+                </Source>}
             </Map>
         </div>
     );

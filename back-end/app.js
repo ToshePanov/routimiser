@@ -3,20 +3,15 @@ if (process.env.NODE_ENV !== "production") {
 }
 const express = require('express');
 const app = express();
-const methodOverride = require('method-override');
 const fetch = require('node-fetch');
 
 const cors = require('cors');
 
 const mbxGeocoding = require('@mapbox/mapbox-sdk/services/geocoding');
 
-const geocoder = mbxGeocoding({ accessToken: process.env.MAPBOX_TOKEN })
+const geocoder = mbxGeocoding({ accessToken: process.env.MAPBOX_TOKEN });
 
-const mapboxUrl = 'https://api.mapbox.com/optimized-trips/v1/mapbox/driving/';
-const mapboxToken = `?access_token=${process.env.MAPBOX_TOKEN}`;
-
-app.use(express.urlencoded({ extended: true }))
-app.use(methodOverride('_method'))
+app.use(express.urlencoded({ extended: true }));
 
 app.use(cors());
 app.use(express.json())
@@ -29,47 +24,56 @@ catchAsync = func => {
 
 const reactAddresses = [];
 
-app.get('/optimiseRoute', async (req, res) => {
-    let url = mapboxUrl;
-
-    for (let i = 0; i < reactAddresses.length; i++) {
-        url = url + reactAddresses[i].geometry[0] + ',' + reactAddresses[i].geometry[1];
-        if (i < reactAddresses.length - 1) {
-            url = url + ';';
-        }
-    }
-
-    url = url + mapboxToken;
-    let result = await fetch(url);
-    const json = await result.json();
-
-    function roundNum(number, decimal_digit = 3) {
+app.get('/optimiseRoute', catchAsync(async (req, res) => {
+    const roundNum = (number, decimal_digit = 3) => {
         let powerOften = Math.pow(10, decimal_digit);
         let result = Math.round(number * powerOften) / powerOften;
-        return result
+        return result;
     }
-    for (let i = 0; i < json.waypoints.length; i++) {
-        for (let j = 0; j < reactAddresses.length; j++) {
-            if ((roundNum(json.waypoints[i].location[0]) === roundNum(reactAddresses[j].geometry[0])) &&
-                (roundNum(json.waypoints[i].location[1]) === roundNum(reactAddresses[j].geometry[1]))) {
-                reactAddresses[j].waypoint_index = json.waypoints[i].waypoint_index;
+
+    const getOptimisedRoute = async (addresses) => {
+        let url = 'https://api.mapbox.com/optimized-trips/v1/mapbox/driving/';
+        const mapboxToken = `?access_token=${process.env.MAPBOX_TOKEN}`;
+
+        for (let i = 0; i < addresses.length; i++) {
+            url = url + addresses[i].geometry[0] + ',' + addresses[i].geometry[1];
+            if (i < addresses.length - 1) {
+                url = url + ';';
             }
         }
-        reactAddresses.sort((a1, a2) => a1.waypoint_index > a2.waypoint_index ? 1 : -1);
+
+        url = url + mapboxToken;
+        const result = await fetch(url);
+        return await result.json();
     }
+
+    const json = await getOptimisedRoute(reactAddresses);
+
+    for (let i = reactAddresses.length - 1; i >= 0; i--) {
+        for (let j = json.waypoints.length - 1; j >= 0; j--) {
+            if ((roundNum(json.waypoints[j].location[0]) === roundNum(reactAddresses[i].geometry[0])) &&
+                (roundNum(json.waypoints[j].location[1]) === roundNum(reactAddresses[i].geometry[1]))) {
+                reactAddresses[i].waypoint_index = json.waypoints[j].waypoint_index;
+                json.waypoints.splice(j, 1);
+            }
+        }
+    }
+    reactAddresses.sort((a1, a2) => a1.waypoint_index > a2.waypoint_index ? 1 : -1);
     res.json({ optimisedRoute: reactAddresses, routeDetails: json.trips[0] });
-});
+}));
 
 
-app.post('/addAddress', async (req, res) => {
+app.post('/addAddress', (req, res) => {
+    if (reactAddresses.length > 11) {
+        return res.json({ message: 'error' });
+    }
     const payload = req.body;
     if (reactAddresses.length === 0) payload.waypoint_index = 0;
     reactAddresses.push(payload);
     res.json({ message: 'success' });
 });
 
-
-app.post('/searchSuggestions', async (req, res) => {
+app.post('/searchSuggestions', catchAsync(async (req, res) => {
     const searchTerm = req.body.searchTerm;
     const suggestedAddresses = [];
 
@@ -78,13 +82,16 @@ app.post('/searchSuggestions', async (req, res) => {
             query: searchTerm,
             countries: ['GB']
         }).send()
-        for (let i = 0; i < geoData.body.features.length; i++) {
+        for (let i in geoData.body.features) {
             const searchResult = geoData.body.features[i];
             suggestedAddresses.push({ searchText: searchResult.place_name, geometry: searchResult.geometry.coordinates });
         }
+
+        res.json({ message: 'success', searchSuggestions: suggestedAddresses });
+    } else {
+        res.json({ message: 'error' });
     }
-    res.json({ message: 'success', searchSuggestions: suggestedAddresses });
-});
+}));
 
 app.get('/addresses', (req, res) => {
     res.json({ addresses: reactAddresses });

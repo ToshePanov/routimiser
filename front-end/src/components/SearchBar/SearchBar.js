@@ -11,6 +11,11 @@ const SearchBar = (props) => {
     const [isSearching, setIsSearching] = useState(false);
     const [searchResults, setSearchResults] = useState([]);
 
+    const [noSearchResults, setNoSearchResults] = useState(false);
+    const [isLoadingResults, setIsLoadingResults] = useState(false);
+    const [isAddressListFull, setIsAddressListFull] = useState(false);
+
+
     const addressCtx = useContext(AddressContext);
 
     const disableSearching = () => {
@@ -18,10 +23,15 @@ const SearchBar = (props) => {
         setSearchResults([]);
         setSearchTerm('');
         addressCtx.setAddressList();
+        addressCtx.isOptimised = false;
     }
 
     const fetchSearchResultsHandler = useCallback(async () => {
         if (searchTerm.trim() === '') return;
+        if (addressCtx.addressList && addressCtx.addressList.length > 11) {
+            setIsAddressListFull(true);
+            return;
+        }
         try {
             const response = await fetch('http://localhost:3001/searchSuggestions', {
                 method: 'POST',
@@ -33,7 +43,14 @@ const SearchBar = (props) => {
                 }
             })
             const searchConfirmation = await response.json();
-            setSearchResults(searchConfirmation.searchSuggestions);
+            if (searchConfirmation.searchSuggestions && searchConfirmation.searchSuggestions.length > 0) {
+                setNoSearchResults(false);
+                setSearchResults(searchConfirmation.searchSuggestions);
+            } else {
+                setNoSearchResults(true);
+            }
+
+            setIsLoadingResults(false);
         }
         catch (err) {
             console.log(err);
@@ -41,16 +58,21 @@ const SearchBar = (props) => {
     }, [searchTerm]);
 
     useEffect(() => {
+        setIsLoadingResults(true);
+
         const delayInputFn = setTimeout(() => {
             fetchSearchResultsHandler();
-        }, 1500)
+        }, 1000)
         return () => clearTimeout(delayInputFn)
     }, [searchTerm])
 
     const searchInputChangeHandler = event => {
+        setSearchResults([]);
         setSearchTerm(event.target.value);
         if (event.target.value.trim() === '') {
             setIsSearching(false);
+            setSearchResults([]);
+            setIsAddressListFull(false);
             return;
         }
         setIsSearching(true);
@@ -63,7 +85,12 @@ const SearchBar = (props) => {
             <input type="text" value={searchTerm} id="searchbar" placeholder="Add waypoint" className={searchBarClasses}
                 onChange={searchInputChangeHandler} >
             </input>
-            {isSearching && <SearchResults entries={searchResults} disableSearching={disableSearching} />}
+            {isSearching && <SearchResults
+                entries={searchResults}
+                disableSearching={disableSearching}
+                noSearchResults={noSearchResults}
+                isLoadingResults={isLoadingResults}
+                isAddressListFull={isAddressListFull} />}
         </div>
     )
 }
