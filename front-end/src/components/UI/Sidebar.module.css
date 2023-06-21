@@ -13,6 +13,7 @@
 
 @media only screen and (min-width: 900px) {
     .sidebar {
+        max-height: 100vh;
         height: 100vh;
         width: 25%;
 
