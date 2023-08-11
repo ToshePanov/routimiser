@@ -25,7 +25,7 @@ catchAsync = func => {
 const reactAddresses = [];
 
 app.get('/optimiseRoute', catchAsync(async (req, res) => {
-    const roundNum = (number, decimal_digit = 3) => {
+    const roundNum = (number, decimal_digit = 2) => {
         let powerOften = Math.pow(10, decimal_digit);
         let result = Math.round(number * powerOften) / powerOften;
         return result;
@@ -34,7 +34,8 @@ app.get('/optimiseRoute', catchAsync(async (req, res) => {
     const getOptimisedRoute = async (addresses) => {
         let url = 'https://api.mapbox.com/optimized-trips/v1/mapbox/driving/';
         const mapboxToken = `?access_token=${process.env.MAPBOX_TOKEN}`;
-
+        addresses.sort((a1, a2) => a1.index > a2.index ? 1 : -1);
+        console.log()
         for (let i = 0; i < addresses.length; i++) {
             url = url + addresses[i].geometry[0] + ',' + addresses[i].geometry[1];
             if (i < addresses.length - 1) {
@@ -48,6 +49,7 @@ app.get('/optimiseRoute', catchAsync(async (req, res) => {
     }
 
     const json = await getOptimisedRoute(reactAddresses);
+    console.log(json);
 
     for (let i = reactAddresses.length - 1; i >= 0; i--) {
         for (let j = json.waypoints.length - 1; j >= 0; j--) {
@@ -59,6 +61,7 @@ app.get('/optimiseRoute', catchAsync(async (req, res) => {
         }
     }
     reactAddresses.sort((a1, a2) => a1.waypoint_index > a2.waypoint_index ? 1 : -1);
+    console.log(reactAddresses);
     res.json({ optimisedRoute: reactAddresses, routeDetails: json.trips[0] });
 }));
 
@@ -68,8 +71,12 @@ app.post('/addAddress', (req, res) => {
         return res.json({ message: 'error' });
     }
     const payload = req.body;
+    payload.index = reactAddresses.length + 1;
     if (reactAddresses.length === 0) payload.waypoint_index = 0;
     reactAddresses.push(payload);
+    for (let i of reactAddresses) {
+        if (i.waypoint_index !== 0) i.waypoint_index = null;
+    }
     res.json({ message: 'success' });
 });
 
@@ -94,6 +101,7 @@ app.post('/searchSuggestions', catchAsync(async (req, res) => {
 }));
 
 app.get('/addresses', (req, res) => {
+    console.log(reactAddresses);
     res.json({ addresses: reactAddresses });
 })
 
